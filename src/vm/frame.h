@@ -5,7 +5,8 @@
 #include "threads/thread.h"
 #include "threads/malloc.h"
 
-
+struct frame* frames; //frame table
+int length;
 
 struct frame {
 	void* upage; //pointer to page that currently occupies this frame (user virtual address????)
@@ -13,8 +14,10 @@ struct frame {
 	struct thread* owner; //the thread that is using this frame
 };
 
-void frame_init(void);
-void* frame_get_free(void);
-void frame_release(void*);
+void frame_init(size_t);
+void* frame_alloc(void);
+int frame_set(void*, void*);
+void frame_evict(void);
+void frame_dealloc(void*);
 
 #endif /* vm/frame.h */

@@ -17,6 +17,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
+#include "vm/frame.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -148,6 +149,13 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
+  int i;
+
+  for(i = 0; i < length; i++) {
+    if(frames[i].owner == cur) {
+      frame_dealloc(frames[i].kpage);
+    }
+  }
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -363,8 +371,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
     }
 
   /* Set up stack. */
-  if (!setup_stack (esp, file_name))
+  if (!setup_stack (esp, file_name)) {
     goto done;
+  }
 
   /* Start address. */
   *eip = (void (*) (void)) ehdr.e_entry;
@@ -457,23 +466,30 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
+      //////// will create our supplemental PTE somewhere in here ///////////////////
+      
+
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
-      if (kpage == NULL)
+      uint8_t *kpage = frame_alloc(); //palloc_get_page (PAL_USER);
+      if (kpage == NULL) {
         return false;
+      }
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+          frame_dealloc(kpage);
+          //palloc_free_page (kpage);
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
 
       /* Add the page to the process's address space. */
+      // move this to page_fault (lazy loading)
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+          frame_dealloc(kpage);
+          //palloc_free_page (kpage);
           return false; 
         }
 
@@ -500,14 +516,14 @@ setup_stack (void **esp, const char* file_name)
   int* address;
   size_t token_len, arg_bytes = 0;
 
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  kpage = frame_alloc(); //palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       if (success)
         *esp = PHYS_BASE;
       else
-        palloc_free_page (kpage);
+        frame_dealloc(kpage); //palloc_free_page (kpage);
     }
 
   strlcpy(file_cpy, file_name, strlen(file_name)+1);

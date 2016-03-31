@@ -20,6 +20,7 @@
 #include "threads/loader.h"
 #include "threads/malloc.h"
 #include "threads/palloc.h"
+#include "vm/frame.h"
 #include "threads/pte.h"
 #include "threads/thread.h"
 #ifdef USERPROG
