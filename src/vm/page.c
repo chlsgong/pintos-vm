@@ -1,6 +1,7 @@
 #include "vm/page.h"
 #include <list.h>
 #include "threads/thread.h"
+#include "threads/malloc.h"
 
 void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t page_read_bytes,
 	uint32_t page_zero_bytes, bool writable, off_t offset) {
@@ -24,10 +25,26 @@ struct sup_pte* page_get(void* upage) {
 	{
 		pte = list_entry (e, struct sup_pte, sup_elem);
 		if(upage == pte->page) {
-			printf("upage: %p, page: %p\n", upage, pte->page);
+			//printf("upage: %p, page: %p\n", upage, pte->page);
 			return pte;
 		}
 	}
 	return NULL;
+}
+
+
+void page_destroy() {
+	struct list_elem* e;
+	struct sup_pte* pte;
+	struct thread* t = thread_current();
+
+	if(!list_empty(&t->sup_page_table)) {
+		e = list_begin (&t->sup_page_table);
+		while(e != list_end (&t->sup_page_table)) {
+			pte = list_entry(e, struct sup_pte, sup_elem);
+			e = list_next(e);
+			free(pte);
+		}
+	} 
 }
 

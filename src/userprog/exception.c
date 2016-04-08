@@ -171,10 +171,12 @@ page_fault (struct intr_frame *f)
     void* upage = pg_round_down(fault_addr);
     struct sup_pte* pte = page_get(upage);
     uint8_t* kpage = frame_alloc();
+
     if(kpage == NULL) {
       // we want to evict a page
     }
     if(pte != NULL) {
+      file_seek (pte->file, pte->offset);
       // file_seek (pte->file, pte->offset);
       /* Load this page. */
       if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
@@ -182,6 +184,7 @@ page_fault (struct intr_frame *f)
         frame_dealloc(kpage);
         kill(f); 
       }
+
       memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
 
       /* Add the page to the process's address space. */
@@ -200,15 +203,16 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  // printf ("Page fault at %p: %s error %s page in %s context.\n",
-  //         fault_addr,
-  //         not_present ? "not present" : "rights violation",
-  //         write ? "writing" : "reading",
-  //         user ? "user" : "kernel");
+   printf ("Page fault at %p: %s error %s page in %s context.\n",
+           fault_addr,
+           not_present ? "not present" : "rights violation",
+           write ? "writing" : "reading",
+           user ? "user" : "kernel");
 
 
   //printf("There is no crying in Pintos!\n");
 
   kill (f);
+  //exit(0);
 }
 

@@ -153,11 +153,15 @@ process_exit (void)
   uint32_t *pd;
   int i;
 
-  for(i = 0; i < length; i++) {
+  frame_dealloc_all();
+
+ /* for(i = 0; i < length; i++) {
     if(frames[i].owner == cur) {
       frame_dealloc(frames[i].kpage);
     }
-  }
+  }*/
+
+  page_destroy();
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
@@ -458,7 +462,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
-  file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
       /* Calculate how to fill this page.
@@ -477,7 +480,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //////// will create our supplemental PTE somewhere in here ///////////////////
       struct sup_pte* entry = malloc(sizeof(struct sup_pte));
       page_add(entry, upage, file, page_read_bytes, page_zero_bytes, writable, ofs);
-      printf("load upage: %p\n", upage);
+      //printf("load upage: %p\n", upage);
       /* Load this page. */
       /*
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
@@ -501,6 +504,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
       upage += PGSIZE;
+      ofs += PGSIZE;
     }
   return true;
 }
@@ -524,9 +528,10 @@ setup_stack (void **esp, const char* file_name)
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
-      if (success)
+      if (success) {
         *esp = PHYS_BASE;
-      else
+        frame_set(((uint8_t *) PHYS_BASE) - PGSIZE, kpage);
+      } else
         frame_dealloc(kpage); //palloc_free_page (kpage);
     }
 

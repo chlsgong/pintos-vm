@@ -8,7 +8,7 @@
 #include "threads/vaddr.h"
 #include <stdio.h>
 
-// static struct lock frame_lock;
+ static struct lock frame_lock;
 
 // Initializes the frame table
 void frame_init(size_t size) {
@@ -16,13 +16,14 @@ void frame_init(size_t size) {
 	struct frame f;
 	frames = malloc(sizeof(struct frame) * size);
 	length = 0;
-	// lock_init(&frame_lock);	
+	 lock_init(&frame_lock);	
 
 	for(i = 0; i < size-1; i++) {
 		f = frames[i];
 		f.kpage = palloc_get_page(PAL_USER | PAL_ZERO);
 		f.upage = NULL;
 		f.owner = NULL;
+		f.occupied = 0;
 		frames[i] = f;
 		length++;
 	}
@@ -31,20 +32,26 @@ void frame_init(size_t size) {
 
 // Allocates a frame given a user address
 void* frame_alloc() {
+	lock_acquire(&frame_lock);
 	int i = 0;
+	void* kpage = NULL;
 	for(i = 0; i < length; i++) {
-		if(frames[i].owner == NULL) {
+		if(!frames[i].occupied) {
 			frames[i].owner = thread_current();
-			return frames[i].kpage;
+			frames[i].occupied = 1;
+			kpage = frames[i].kpage;
+			break;
 		}
 	}
 	// printf("\n\nkpage val after loop: %p, thread: %s\n\n", kpage, thread_current()->name);
-	return NULL;
+	lock_release(&frame_lock);
+	return kpage;
 }
 
 // Sets a frame's mapping to a different user address
 // Useful for eviction
 int frame_set(void* upage, void* kpage) {
+	lock_acquire(&frame_lock);
 	int i;
 	int found = 0;
 	for(i = 0; i < length; i++) {
@@ -54,6 +61,7 @@ int frame_set(void* upage, void* kpage) {
 			break;
 		}
 	}
+	lock_release(&frame_lock);
 	return found;
 }
 
@@ -69,15 +77,31 @@ int frame_set(void* upage, void* kpage) {
 // }
 
 
+void frame_dealloc_all() {
+	lock_acquire(&frame_lock);
+	int i;
+	for(i = 0; i < length; i++) {
+		if(frames[i].owner == thread_current()) {
+			frames[i].owner = NULL;
+			frames[i].upage = NULL;
+			//frames[i].occupied = 0;
+		}
+	}
+    lock_release(&frame_lock);
+}
+
+
 // Deallocates and frees a frame
 void frame_dealloc(void* kpage) {
+	lock_acquire(&frame_lock);
 	int i;
 	for(i = 0; i < length; i++) {
 		if(frames[i].kpage == kpage) {
 			frames[i].owner = NULL;
 			frames[i].upage = NULL;
-			frames[i].kpage = NULL;
+			frames[i].occupied = 0;
 			break;
 		}
 	}
+	lock_release(&frame_lock);
 }
