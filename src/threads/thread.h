@@ -8,6 +8,7 @@
 #include "userprog/syscall.h"
 #include "filesys/file.h"
 #include "filesys/inode.h"
+#include "vm/page.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -27,6 +28,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define MAX_PAGES 1048576
 
 /* A kernel thread or user process.
 
@@ -154,6 +157,8 @@ struct thread
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
+
+    struct list sup_page_table;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

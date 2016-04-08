@@ -6,6 +6,11 @@
 #include "threads/thread.h"
 #include "userprog/syscall.h"
 #include "vm/frame.h"
+#include "vm/page.h"
+#include "threads/vaddr.h"
+#include "filesys/file.h"
+#include <string.h>
+#include "userprog/pagedir.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -110,6 +115,18 @@ kill (struct intr_frame *f)
     }
 }
 
+
+static bool
+page_install (void *upage, void *kpage, bool writable)
+{
+  struct thread *t = thread_current ();
+
+  /* Verify that there's not already a page at that virtual
+     address, then map our page there. */
+  return (pagedir_get_page (t->pagedir, upage) == NULL
+          && pagedir_set_page (t->pagedir, upage, kpage, writable));
+}
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -138,8 +155,6 @@ page_fault (struct intr_frame *f)
      (#PF)". */
   asm ("movl %%cr2, %0" : "=r" (fault_addr));
 
-  //frame_alloc(fault_addr);
-
   /* Turn interrupts back on (they were only off so that we could
      be assured of reading CR2 before it changed). */
   intr_enable ();
@@ -152,17 +167,47 @@ page_fault (struct intr_frame *f)
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
 
+  if(not_present) {
+    void* upage = pg_round_down(fault_addr);
+    struct sup_pte* pte = page_get(upage);
+    uint8_t* kpage = frame_alloc();
+    if(kpage == NULL) {
+      // we want to evict a page
+    }
+    if(pte != NULL) {
+      // file_seek (pte->file, pte->offset);
+      /* Load this page. */
+      if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
+      {
+        frame_dealloc(kpage);
+        kill(f); 
+      }
+      memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
+
+      /* Add the page to the process's address space. */
+      // move this to page_fault (lazy loading)
+      if (!page_install (pte->page, kpage, pte->writable)) 
+      {
+        frame_dealloc(kpage);
+        kill(f); 
+      }
+      frame_set(upage, kpage);
+
+      return;
+    }
+  }
+
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
-          fault_addr,
-          not_present ? "not present" : "rights violation",
-          write ? "writing" : "reading",
-          user ? "user" : "kernel");
+  // printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //         fault_addr,
+  //         not_present ? "not present" : "rights violation",
+  //         write ? "writing" : "reading",
+  //         user ? "user" : "kernel");
 
 
-  printf("There is no crying in Pintos!\n");
+  //printf("There is no crying in Pintos!\n");
 
   kill (f);
 }

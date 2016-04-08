@@ -4,6 +4,7 @@
 #include "threads/thread.h"
 #include "threads/synch.h"
 #include "threads/malloc.h"
+
 #include "threads/vaddr.h"
 #include <stdio.h>
 
@@ -30,36 +31,31 @@ void frame_init(size_t size) {
 
 // Allocates a frame given a user address
 void* frame_alloc() {
-	void* kpage = NULL;
 	int i = 0;
 	for(i = 0; i < length; i++) {
 		if(frames[i].owner == NULL) {
 			frames[i].owner = thread_current();
-			//frames[i]->upage = pg_round_down(upage);
-			kpage = frames[i].kpage;
-			break;
+			return frames[i].kpage;
 		}
 	}
 	// printf("\n\nkpage val after loop: %p, thread: %s\n\n", kpage, thread_current()->name);
-	return kpage;
+	return NULL;
 }
-
 
 // Sets a frame's mapping to a different user address
 // Useful for eviction
-// int frame_set(void* upage, void* kpage) {
-// 	int i;
-// 	int length = sizeof(frames) / sizeof(struct frame*);
-// 	int found = 0;
-// 	for(i = 0; i < length; i++) {
-// 		if(frames[i]->kpage == kpage) {
-// 			frames[i]->upage = pg_round_down(upage);
-// 			found = 1;
-// 			break;
-// 		}
-// 	}
-// 	return found;
-// }
+int frame_set(void* upage, void* kpage) {
+	int i;
+	int found = 0;
+	for(i = 0; i < length; i++) {
+		if(frames[i].kpage == kpage) {
+			frames[i].upage = upage;
+			found = 1;
+			break;
+		}
+	}
+	return found;
+}
 
 // void frame_evict () {
 // 	for(i = 0; i < length; i++) {
@@ -76,15 +72,12 @@ void* frame_alloc() {
 // Deallocates and frees a frame
 void frame_dealloc(void* kpage) {
 	int i;
-	int length = sizeof(frames) / sizeof(struct frame);
 	for(i = 0; i < length; i++) {
 		if(frames[i].kpage == kpage) {
 			frames[i].owner = NULL;
 			frames[i].upage = NULL;
-			palloc_free_page(kpage);
 			frames[i].kpage = NULL;
 			break;
 		}
 	}
 }
-

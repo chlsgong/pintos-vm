@@ -15,9 +15,11 @@
 #include "threads/init.h"
 #include "threads/interrupt.h"
 #include "threads/palloc.h"
+#include "threads/malloc.h"
 #include "threads/thread.h"
 #include "threads/vaddr.h"
 #include "vm/frame.h"
+#include "vm/page.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -338,7 +340,7 @@ load (const char *file_name, void (**eip) (void), void **esp)
         case PT_SHLIB:
           goto done;
         case PT_LOAD:
-          if (validate_segment (&phdr, file)) 
+          if (validate_segment (&phdr, file))
             {
               bool writable = (phdr.p_flags & PF_W) != 0;
               uint32_t file_page = phdr.p_offset & ~PGMASK;
@@ -456,7 +458,6 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
-
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
@@ -466,16 +467,19 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      //////// will create our supplemental PTE somewhere in here ///////////////////
-      
-
       /* Get a page of memory. */
-      uint8_t *kpage = frame_alloc(); //palloc_get_page (PAL_USER);
+      // move to page fault
+     /* uint8_t *kpage = frame_alloc(); //palloc_get_page (PAL_USER);
       if (kpage == NULL) {
         return false;
-      }
+      }*/
 
+      //////// will create our supplemental PTE somewhere in here ///////////////////
+      struct sup_pte* entry = malloc(sizeof(struct sup_pte));
+      page_add(entry, upage, file, page_read_bytes, page_zero_bytes, writable, ofs);
+      printf("load upage: %p\n", upage);
       /* Load this page. */
+      /*
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
           frame_dealloc(kpage);
@@ -486,12 +490,12 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Add the page to the process's address space. */
       // move this to page_fault (lazy loading)
-      if (!install_page (upage, kpage, writable)) 
+     /* if (!install_page (upage, kpage, writable)) 
         {
           frame_dealloc(kpage);
           //palloc_free_page (kpage);
           return false; 
-        }
+        } 
 
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -529,7 +533,7 @@ setup_stack (void **esp, const char* file_name)
   strlcpy(file_cpy, file_name, strlen(file_name)+1);
   argc = 0;
   // tokenize command line
-  for (token = strtok_r (file_cpy, " ", &save_ptr); token != NULL; 
+  for (token = strtok_r (file_cpy, " ", &save_ptr); token != NULL;
     token = strtok_r (NULL, " ", &save_ptr)) {
     // create array
     argv[argc] = token;
