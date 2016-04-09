@@ -155,12 +155,6 @@ process_exit (void)
 
   frame_dealloc_all();
 
- /* for(i = 0; i < length; i++) {
-    if(frames[i].owner == cur) {
-      frame_dealloc(frames[i].kpage);
-    }
-  }*/
-
   page_destroy();
 
   /* Destroy the current process's page directory and switch back
@@ -499,7 +493,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
           //palloc_free_page (kpage);
           return false; 
         } 
-
+      
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;

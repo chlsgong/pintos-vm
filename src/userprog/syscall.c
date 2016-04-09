@@ -58,6 +58,7 @@ syscall_handler (struct intr_frame *f)
 
   valid_pointer(f->esp);
   syscall = *(int *)(f->esp);
+  thread_current()->esp = f->esp;
 
   switch(syscall) {
   	case(SYS_HALT):

@@ -43,7 +43,6 @@ void* frame_alloc() {
 			break;
 		}
 	}
-	// printf("\n\nkpage val after loop: %p, thread: %s\n\n", kpage, thread_current()->name);
 	lock_release(&frame_lock);
 	return kpage;
 }

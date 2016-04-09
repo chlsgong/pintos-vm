@@ -171,18 +171,25 @@ page_fault (struct intr_frame *f)
   struct sup_pte* pte;
   uint8_t* kpage;
 
-
+  if(fault_addr == NULL)
+    kill(f);
 
   if(not_present) {
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
     //check for user or kernel context -- which esp to use
-    if ((fault_addr < PHYS_BASE) && (fault_addr >= (f->esp - PGSIZE))) {
-      //printf("here. upage: %x\n\n", upage);
+    // if(!user) {
+    //   if ((fault_addr > PHYS_BASE) && (fault_addr >= (thread_current()->esp - PGSIZE))) {
+    //     //printf("here. upage: %x\n\n", upage);
+    //     pte = malloc(sizeof(struct sup_pte));
+    //     page_add_sp(pte, upage);
+    //   }
+    // }
+    if ((fault_addr < PHYS_BASE) && (fault_addr >= (f->esp - PGSIZE))) { // if part of the stack
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, upage);
     }
-    else {
+    else { // else user program address
       pte = page_get(upage);
 
       if(kpage == NULL) {
@@ -201,14 +208,14 @@ page_fault (struct intr_frame *f)
         memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
       } 
     }
-          /* Add the page to the process's address space. */
+      /* Add the page to the process's address space. */
       // move this to page_fault (lazy loading)
     if (!page_install (upage, kpage, pte->writable)) 
     {
-     //printf("installing page fail\n\n");
       frame_dealloc(kpage);
       kill(f); 
     }
+    // printf("fault_addr: %p\n", fault_addr);
     frame_set(upage, kpage);
     return;
   }
@@ -216,11 +223,11 @@ page_fault (struct intr_frame *f)
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-   printf ("Page fault at %p: %s error %s page in %s context.\n",
-           fault_addr,
-           not_present ? "not present" : "rights violation",
-           write ? "writing" : "reading",
-           user ? "user" : "kernel");
+  printf ("Page fault at %p: %s error %s page in %s context.\n",
+         fault_addr,
+         not_present ? "not present" : "rights violation",
+         write ? "writing" : "reading",
+         user ? "user" : "kernel");
 
 
   //printf("There is no crying in Pintos!\n");
