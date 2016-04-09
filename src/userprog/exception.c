@@ -171,10 +171,12 @@ page_fault (struct intr_frame *f)
   struct sup_pte* pte;
   uint8_t* kpage;
 
+
+
   if(not_present) {
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
-    //printf("esp - 32: %x\n\n", f->esp - 32);
+    //check for user or kernel context -- which esp to use
     if ((fault_addr < PHYS_BASE) && (fault_addr >= (f->esp - PGSIZE))) {
       //printf("here. upage: %x\n\n", upage);
       pte = malloc(sizeof(struct sup_pte));

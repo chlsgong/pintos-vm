@@ -82,9 +82,10 @@ void frame_dealloc_all() {
 	int i;
 	for(i = 0; i < length; i++) {
 		if(frames[i].owner == thread_current()) {
+			pagedir_clear_page(thread_current()->pagedir, frames[i].upage);
 			frames[i].owner = NULL;
 			frames[i].upage = NULL;
-			//frames[i].occupied = 0;
+			frames[i].occupied = 0;
 		}
 	}
     lock_release(&frame_lock);
