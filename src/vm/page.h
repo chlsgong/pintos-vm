@@ -19,7 +19,7 @@ struct sup_pte {
 
 void page_add(struct sup_pte*, void*, struct file*,
 			 uint32_t, uint32_t, bool, off_t);
-
+void page_add_sp(struct sup_pte*, void*);
 struct sup_pte *page_get(void*);
 void page_destroy(void);
 

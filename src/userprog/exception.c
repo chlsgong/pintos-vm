@@ -166,38 +166,49 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+  
+  void* upage;
+  struct sup_pte* pte;
+  uint8_t* kpage;
 
   if(not_present) {
-    void* upage = pg_round_down(fault_addr);
-    struct sup_pte* pte = page_get(upage);
-    uint8_t* kpage = frame_alloc();
+    upage = pg_round_down(fault_addr);
+    kpage = frame_alloc();
+    //printf("esp - 32: %x\n\n", f->esp - 32);
+    if ((fault_addr < PHYS_BASE) && (fault_addr >= (f->esp - PGSIZE))) {
+      //printf("here. upage: %x\n\n", upage);
+      pte = malloc(sizeof(struct sup_pte));
+      page_add_sp(pte, upage);
+    }
+    else {
+      pte = page_get(upage);
 
-    if(kpage == NULL) {
+      if(kpage == NULL) {
       // we want to evict a page
-    }
-    if(pte != NULL) {
-      file_seek (pte->file, pte->offset);
-      // file_seek (pte->file, pte->offset);
+      }
+
+      if(pte != NULL) {
+        file_seek (pte->file, pte->offset);
       /* Load this page. */
-      if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
-      {
-        frame_dealloc(kpage);
-        kill(f); 
-      }
+        if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
+        {
+          frame_dealloc(kpage);
+          kill(f); 
+        }
 
-      memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      // move this to page_fault (lazy loading)
-      if (!page_install (pte->page, kpage, pte->writable)) 
-      {
-        frame_dealloc(kpage);
-        kill(f); 
-      }
-      frame_set(upage, kpage);
-
-      return;
+        memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
+      } 
     }
+          /* Add the page to the process's address space. */
+      // move this to page_fault (lazy loading)
+    if (!page_install (upage, kpage, pte->writable)) 
+    {
+     //printf("installing page fail\n\n");
+      frame_dealloc(kpage);
+      kill(f); 
+    }
+    frame_set(upage, kpage);
+    return;
   }
 
   /* To implement virtual memory, delete the rest of the function

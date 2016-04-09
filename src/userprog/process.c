@@ -523,11 +523,16 @@ setup_stack (void **esp, const char* file_name)
   int i, argc;
   int* address;
   size_t token_len, arg_bytes = 0;
+  struct sup_pte* pte;
+  
 
   kpage = frame_alloc(); //palloc_get_page (PAL_USER | PAL_ZERO);
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+      pte = malloc(sizeof(struct sup_pte));
+      page_add_sp(pte, ((uint8_t *) PHYS_BASE) - PGSIZE);
+      //printf("esp limit: %x\n\n", ((uint8_t *) PHYS_BASE) - PGSIZE);
       if (success) {
         *esp = PHYS_BASE;
         frame_set(((uint8_t *) PHYS_BASE) - PGSIZE, kpage);

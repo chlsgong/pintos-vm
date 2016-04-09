@@ -16,6 +16,13 @@ void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t pag
 	list_push_back(&thread_current()->sup_page_table, &entry->sup_elem);
 }
 
+void page_add_sp(struct sup_pte* entry, void* page) {
+	entry->swap_entry = NULL;
+	entry->page = page;
+	entry->writable = true;
+	list_push_back(&thread_current()->sup_page_table, &entry->sup_elem);
+}
+
 struct sup_pte* page_get(void* upage) {
 	struct list_elem* e;
 	struct sup_pte* pte;
