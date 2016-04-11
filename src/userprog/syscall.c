@@ -203,7 +203,7 @@ bool is_valid(const void *pointer) {
   /*Charles Drove Here*/
   struct thread *cur_thread = thread_current();
   if(pointer == NULL || is_kernel_vaddr(pointer) ||
-    lookup_page(cur_thread->pagedir, pointer, false) == NULL) {
+    lookup_page(cur_thread->pagedir, pointer, false) == NULL){
     return 0;
   }
   return 1;
@@ -264,6 +264,10 @@ void exit (int status) {
   printf("%s: exit(%d)\n", thread_current()->file_name, status);  
   sema_up(&thread_current()->process_sema);
 
+  if(file_lock.holder == thread_current()) {
+    lock_release(&file_lock);
+  }
+
     // Closing and removing all open files
   if(!list_empty(&thread_current()->open_files)) {
     e = list_begin (&thread_current()->open_files);
@@ -275,12 +279,14 @@ void exit (int status) {
     }
   } 
 
+
   // close the current process' file (executable)
   if(thread_current()->exec_file != NULL) {
     lock_acquire(&file_lock);
     file_close(thread_current()->exec_file);
     lock_release(&file_lock);
   }
+
   thread_exit();
 }
 

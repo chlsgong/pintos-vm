@@ -171,7 +171,7 @@ page_fault (struct intr_frame *f)
   struct sup_pte* pte;
   uint8_t* kpage;
   void* esp;
-
+  // printf("\nUSER: %d\n", user);
   if(fault_addr == NULL)
     kill(f);
 
@@ -197,8 +197,9 @@ page_fault (struct intr_frame *f)
     //   }
     // } 
     // user context and within page and esp
-    if ((fault_addr < PHYS_BASE) && (fault_addr > (esp - PGSIZE))) { // if part of the stack
+    if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // if part of the stack
       //printf("\nfault addr: %p, esp: %p, esp - fault_addr: %d\n", fault_addr, esp, (esp - fault_addr));
+      //printf("\ngoing in grow stack\n");
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, upage);
     } 
@@ -218,7 +219,7 @@ page_fault (struct intr_frame *f)
       // we want to evict a page
       }
 
-      printf("\nkpage: %p\n", kpage);
+      // printf("\nfault_addr: %p\n", fault_addr);
 
       if(pte != NULL) {
         file_seek (pte->file, pte->offset);
@@ -242,21 +243,22 @@ page_fault (struct intr_frame *f)
     // printf("fault_addr: %p\n", fault_addr);
     frame_set(upage, kpage);
     return;
-  }
+  } 
+
+  
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  printf ("Page fault at %p: %s error %s page in %s context.\n",
+  /*printf ("Page fault at %p: %s error %s page in %s context.\n",
          fault_addr,
          not_present ? "not present" : "rights violation",
          write ? "writing" : "reading",
-         user ? "user" : "kernel");
+         user ? "user" : "kernel");*/
 
 
   //printf("There is no crying in Pintos!\n");
+  exit(-1);
 
-  kill (f);
-  //exit(0);
 }
 
