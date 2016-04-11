@@ -32,7 +32,6 @@ struct sup_pte* page_get(void* upage) {
 	{
 		pte = list_entry (e, struct sup_pte, sup_elem);
 		if(upage == pte->page) {
-			//printf("upage: %p, page: %p\n", upage, pte->page);
 			return pte;
 		}
 	}

@@ -14,6 +14,8 @@
 #include "lib/string.h"
 #include "userprog/process.h"
 #include "devices/input.h"
+#include "threads/pte.h"
+
 
 static void syscall_handler (struct intr_frame *);
 
@@ -39,6 +41,44 @@ static struct lock file_lock;
 void syscall_init (void) {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
   lock_init(&file_lock);
+}
+
+/* Returns the address of the page table entry for virtual
+   address VADDR in page directory PD.
+   If PD does not have a page table for VADDR, behavior depends
+   on CREATE.  If CREATE is true, then a new page table is
+   created and a pointer into it is returned.  Otherwise, a null
+   pointer is returned. */
+static uint32_t *
+lookup_page (uint32_t *pd, const void *vaddr, bool create)
+{
+  uint32_t *pt, *pde;
+
+  ASSERT (pd != NULL);
+
+  /* Shouldn't create new kernel virtual mappings. */
+  ASSERT (!create || is_user_vaddr (vaddr));
+
+  /* Check for a page table for VADDR.
+     If one is missing, create one if requested. */
+  pde = pd + pd_no (vaddr);
+  if (*pde == 0) 
+    {
+      if (create)
+        {
+          pt = palloc_get_page (PAL_ZERO);
+          if (pt == NULL) 
+            return NULL; 
+      
+          *pde = pde_create (pt);
+        }
+      else
+        return NULL;
+    }
+
+  /* Return the page table entry. */
+  pt = pde_get_pt (*pde);
+  return &pt[pt_no (vaddr)];
 }
 
 static void
@@ -163,7 +203,7 @@ bool is_valid(const void *pointer) {
   /*Charles Drove Here*/
   struct thread *cur_thread = thread_current();
   if(pointer == NULL || is_kernel_vaddr(pointer) ||
-    pagedir_get_page (cur_thread->pagedir, pointer) == NULL) {
+    lookup_page(cur_thread->pagedir, pointer, false) == NULL) {
     return 0;
   }
   return 1;

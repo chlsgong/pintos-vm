@@ -170,31 +170,55 @@ page_fault (struct intr_frame *f)
   void* upage;
   struct sup_pte* pte;
   uint8_t* kpage;
+  void* esp;
 
   if(fault_addr == NULL)
     kill(f);
 
+  if (!user) {
+    esp = thread_current()->esp;
+  } else {
+    esp = f->esp;
+  }
+
+  //printf("\nfault_addr: %p\n", fault_addr);
   if(not_present) {
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
-    //check for user or kernel context -- which esp to use
+
+    //printf("\nfault addr: %p\n", fault_addr);
+
+   // printf("\nupage: %p\n", upage);
+    //check for user or kernel context -- which esp to use, ASK ABOUT THIS!!!
     // if(!user) {
-    //   if ((fault_addr > PHYS_BASE) && (fault_addr >= (thread_current()->esp - PGSIZE))) {
-    //     //printf("here. upage: %x\n\n", upage);
+    //   if ((fault_addr > PHYS_BASE) && (fault_addr >= (esp - PGSIZE))) {
     //     pte = malloc(sizeof(struct sup_pte));
     //     page_add_sp(pte, upage);
     //   }
-    // }
-    if ((fault_addr < PHYS_BASE) && (fault_addr >= (f->esp - PGSIZE))) { // if part of the stack
+    // } 
+    // user context and within page and esp
+    if ((fault_addr < PHYS_BASE) && (fault_addr > (esp - PGSIZE))) { // if part of the stack
+      //printf("\nfault addr: %p, esp: %p, esp - fault_addr: %d\n", fault_addr, esp, (esp - fault_addr));
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, upage);
-    }
-    else { // else user program address
+    } 
+    else {
+    //printf("\nfault addr: %p\n", fault_addr);
+    //printf("\nuser: %d\n", user);
+      /*if(fault_addr < esp - PGSIZE){
+        if(!page_get(upage))
+          exit(-1);
+      }*/
       pte = page_get(upage);
+      if(pte == NULL) {
+        exit(-1);
+      }
 
       if(kpage == NULL) {
       // we want to evict a page
       }
+
+      printf("\nkpage: %p\n", kpage);
 
       if(pte != NULL) {
         file_seek (pte->file, pte->offset);

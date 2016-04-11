@@ -474,7 +474,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //////// will create our supplemental PTE somewhere in here ///////////////////
       struct sup_pte* entry = malloc(sizeof(struct sup_pte));
       page_add(entry, upage, file, page_read_bytes, page_zero_bytes, writable, ofs);
-      //printf("load upage: %p\n", upage);
+     // printf("load upage: %p\n", upage);
       /* Load this page. */
       /*
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
@@ -526,6 +526,7 @@ setup_stack (void **esp, const char* file_name)
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, ((uint8_t *) PHYS_BASE) - PGSIZE);
+      //printf("\nupage: %p\n", ((uint8_t *) PHYS_BASE) - PGSIZE);
       //printf("esp limit: %x\n\n", ((uint8_t *) PHYS_BASE) - PGSIZE);
       if (success) {
         *esp = PHYS_BASE;
