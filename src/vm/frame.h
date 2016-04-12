@@ -7,6 +7,7 @@
 
 struct frame* frames; //frame table
 int length;
+int clock_ptr;
 
 struct frame {
 	void* upage; //pointer to page that currently occupies this frame (user virtual address????)

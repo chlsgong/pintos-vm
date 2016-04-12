@@ -127,6 +127,25 @@ page_install (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
+void* run_clock() {
+  void* freed_frame = NULL;
+  void* upage = NULL;
+  while(!freed_frame) {
+    upage = frames[clock_ptr].upage;
+    if(pagedir_is_accessed(thread_current()->pagedir, upage)) {
+      pagedir_set_accessed(thread_current()->pagedir, upage, false);
+    } else {
+      freed_frame = frames[clock_ptr].kpage;
+    }
+    if(clock_ptr == (length - 1)) {
+      clock_ptr = 0;
+    } else {
+      clock_ptr++;
+    }
+  }
+  return freed_frame;
+}
+
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
@@ -183,6 +202,9 @@ page_fault (struct intr_frame *f)
 
   //printf("\nfault_addr: %p\n", fault_addr);
   if(not_present) {
+
+    // CHECK IF PAGE IS IN SWAP BEFORE READING FROM FILE
+
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
 
@@ -216,7 +238,7 @@ page_fault (struct intr_frame *f)
       }
 
       if(kpage == NULL) {
-      // we want to evict a page
+      // kpage = run_clock();
       }
 
       // printf("\nfault_addr: %p\n", fault_addr);
@@ -224,6 +246,7 @@ page_fault (struct intr_frame *f)
       if(pte != NULL) {
         file_seek (pte->file, pte->offset);
       /* Load this page. */
+        // LOCK AROUND FILE_READ
         if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
         {
           frame_dealloc(kpage);
@@ -245,7 +268,7 @@ page_fault (struct intr_frame *f)
     return;
   } 
 
-  
+
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

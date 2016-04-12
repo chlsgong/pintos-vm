@@ -27,6 +27,7 @@ void frame_init(size_t size) {
 		frames[i] = f;
 		length++;
 	}
+	clock_ptr = 0;
 }
 
 
