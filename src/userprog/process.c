@@ -154,7 +154,7 @@ process_exit (void)
   int i;
 
   frame_dealloc_all();
-
+  swap_remove_process();
   page_destroy();
 
   /* Destroy the current process's page directory and switch back

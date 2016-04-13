@@ -6,7 +6,7 @@
 void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t page_read_bytes,
 	uint32_t page_zero_bytes, bool writable, off_t offset) {
 	
-	entry->swap_entry = NULL;
+	entry->swap_entry = -1;
 	entry->page = page;
 	entry->file = file; 
 	entry->page_read_bytes = page_read_bytes;
@@ -17,7 +17,7 @@ void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t pag
 }
 
 void page_add_sp(struct sup_pte* entry, void* page) {
-	entry->swap_entry = NULL;
+	entry->swap_entry = -1;
 	entry->page = page;
 	entry->writable = true;
 	list_push_back(&thread_current()->sup_page_table, &entry->sup_elem);
@@ -38,6 +38,9 @@ struct sup_pte* page_get(void* upage) {
 	return NULL;
 }
 
+void page_set_swap(struct sup_pte* entry, int start) {
+	entry->swap_entry = start;
+}
 
 void page_destroy() {
 	struct list_elem* e;

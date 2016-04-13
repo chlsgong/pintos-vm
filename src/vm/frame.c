@@ -65,16 +65,19 @@ int frame_set(void* upage, void* kpage) {
 	return found;
 }
 
-// void frame_evict () {
-// 	for(i = 0; i < length; i++) {
-// 		if(frames[i]->owner == NULL) {
-// 			frames[i]->owner = thread_current();
-// 			kpage = frames[i]->kpage;
-// 			full = 0;
-// 			break;
-// 		}
-// 	}
-// }
+void* frame_get_upage(void* kpage) {
+	lock_acquire(&frame_lock);
+	int i;
+	void* upage = NULL;
+	for(i = 0; i < length; i++) {
+		if(frames[i].kpage == kpage) {
+			upage = frames[i].upage;
+			break;
+		}
+	}
+	lock_release(&frame_lock);
+	return upage;
+}
 
 
 void frame_dealloc_all() {

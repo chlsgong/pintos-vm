@@ -11,6 +11,8 @@
 #include "filesys/file.h"
 #include <string.h>
 #include "userprog/pagedir.h"
+#include "vm/swap.h"
+#include "devices/block.h"
 
 /* Number of page faults processed. */
 static long long page_fault_cnt;
@@ -127,7 +129,7 @@ page_install (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-void* run_clock() {
+static void* run_clock(void) {
   void* freed_frame = NULL;
   void* upage = NULL;
   while(!freed_frame) {
@@ -187,10 +189,12 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
   
   void* upage;
+  void* old_upage;
   struct sup_pte* pte;
   uint8_t* kpage;
   void* esp;
-  // printf("\nUSER: %d\n", user);
+  int slot;
+
   if(fault_addr == NULL)
     kill(f);
 
@@ -208,40 +212,35 @@ page_fault (struct intr_frame *f)
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
 
-    //printf("\nfault addr: %p\n", fault_addr);
-
-   // printf("\nupage: %p\n", upage);
-    //check for user or kernel context -- which esp to use, ASK ABOUT THIS!!!
-    // if(!user) {
-    //   if ((fault_addr > PHYS_BASE) && (fault_addr >= (esp - PGSIZE))) {
-    //     pte = malloc(sizeof(struct sup_pte));
-    //     page_add_sp(pte, upage);
-    //   }
-    // } 
+    // 1. Get page table entry from either stack growth or upage
     // user context and within page and esp
     if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // if part of the stack
-      //printf("\nfault addr: %p, esp: %p, esp - fault_addr: %d\n", fault_addr, esp, (esp - fault_addr));
-      //printf("\ngoing in grow stack\n");
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, upage);
-    } 
+    }
     else {
-    //printf("\nfault addr: %p\n", fault_addr);
-    //printf("\nuser: %d\n", user);
-      /*if(fault_addr < esp - PGSIZE){
-        if(!page_get(upage))
-          exit(-1);
-      }*/
       pte = page_get(upage);
       if(pte == NULL) {
         exit(-1);
       }
+    }
 
-      if(kpage == NULL) {
-      // kpage = run_clock();
-      }
+    // 2. If frame table is full, evict a frame and add the old upage to swap
+    if(kpage == NULL) { // evict first
+      kpage = run_clock(); // evict frame
+      old_upage = frame_get_upage(kpage);
+      frame_dealloc(kpage);
+      slot = swap_add(old_upage, kpage); // add to swap table
+      page_set_swap(pte, slot);
+    }
 
-      // printf("\nfault_addr: %p\n", fault_addr);
+    // 3. If the page exists in swap get from swap
+    if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
+      page_set_swap(pte, -1);
+    }
+    // 4. Else get the page from the file
+    else {
+      // pte = page_get(upage);
 
       if(pte != NULL) {
         file_seek (pte->file, pte->offset);
@@ -256,14 +255,15 @@ page_fault (struct intr_frame *f)
         memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
       } 
     }
-      /* Add the page to the process's address space. */
-      // move this to page_fault (lazy loading)
+
+    // 5. Map page with frame
+    /* Add the page to the process's address space. */
+    // move this to page_fault (lazy loading)
     if (!page_install (upage, kpage, pte->writable)) 
     {
       frame_dealloc(kpage);
       kill(f); 
     }
-    // printf("fault_addr: %p\n", fault_addr);
     frame_set(upage, kpage);
     return;
   } 

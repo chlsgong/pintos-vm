@@ -19,6 +19,7 @@ struct frame {
 void frame_init(size_t);
 void* frame_alloc(void);
 int frame_set(void*, void*);
+void* frame_get_upage(void*);
 void frame_evict(void);
 void frame_dealloc_all(void);
 void frame_dealloc(void*);
