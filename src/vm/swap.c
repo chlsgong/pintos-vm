@@ -8,6 +8,7 @@
 void swap_init() {
 	int i;
 	swap_device = block_get_role(BLOCK_SWAP);
+	lock_init(&swap_lock);
 	
 	if (swap_device == NULL)
     	PANIC("No swap device found, can't initialize swap.");
@@ -23,8 +24,10 @@ int swap_add(void* upage, void* kpage) {
     int i, j;
     int ofs = 0;
 
+    lock_acquire(&swap_lock);
     for(i = 0; i < NUM_SECTORS; i++) {
 		if(swap_table[i].free) { // found free swap slot
+			pagedir_clear_page(thread_current()->pagedir, upage);
 			swap_table[i].owner = thread_current();
 			swap_table[i].upage = upage;
 			swap_table[i].free = 0;
@@ -32,9 +35,11 @@ int swap_add(void* upage, void* kpage) {
 				block_write(swap_device, swap_table[i].start + j, kpage + ofs);
 				ofs += BLOCK_SECTOR_SIZE;
 			}
+			lock_release(&swap_lock);
 			return i;
 		}
 	}
+	lock_release(&swap_lock);
 	PANIC("No free swap slot available.");
 }
 
@@ -42,10 +47,11 @@ int swap_remove(int slot, void* kpage) {
 	int i, j;
 	int ofs = 0;
 
-	if(swap_table[slot].free)
-		return 0;
-
-	pagedir_clear_page(thread_current()->pagedir, swap_table[slot].upage);
+    lock_acquire(&swap_lock);
+	if(slot < 0 || swap_table[slot].free) {
+	  	lock_release(&swap_lock);
+	  	return 0;
+	}
 	swap_table[slot].free = 1;
 	swap_table[slot].owner = NULL;
 	swap_table[slot].upage = NULL;
@@ -54,12 +60,14 @@ int swap_remove(int slot, void* kpage) {
 		ofs += BLOCK_SECTOR_SIZE;
 	}
 	// zero out swap slot?
+	lock_release(&swap_lock);
 	return 1;
 }
 
 void swap_remove_process() {
 	int i = 0;
 
+    lock_acquire(&swap_lock);
 	for(i = 0; i < NUM_SECTORS; i++) {
 		if(swap_table[i].owner == thread_current()) {
 			swap_table[i].free = 1;
@@ -67,4 +75,5 @@ void swap_remove_process() {
 			swap_table[i].upage = NULL;
 		}
 	}
+	lock_release(&swap_lock);
 }

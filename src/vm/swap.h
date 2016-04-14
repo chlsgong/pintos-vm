@@ -16,6 +16,7 @@ struct swap_slot
 
 struct swap_slot swap_table[NUM_SECTORS];
 struct block* swap_device;
+struct lock swap_lock;
 
 void swap_init(void);
 int swap_add(void*, void*);

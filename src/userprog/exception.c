@@ -14,6 +14,7 @@
 #include "vm/swap.h"
 #include "devices/block.h"
 
+
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -191,6 +192,7 @@ page_fault (struct intr_frame *f)
   void* upage;
   void* old_upage;
   struct sup_pte* pte;
+  struct sup_pte* old_pte;
   uint8_t* kpage;
   void* esp;
   int slot;
@@ -200,61 +202,106 @@ page_fault (struct intr_frame *f)
 
   if (!user) {
     esp = thread_current()->esp;
-  } else {
+  }
+  else {
     esp = f->esp;
   }
 
-  //printf("\nfault_addr: %p\n", fault_addr);
   if(not_present) {
-
-    // CHECK IF PAGE IS IN SWAP BEFORE READING FROM FILE
-
     upage = pg_round_down(fault_addr);
     kpage = frame_alloc();
 
-    // 1. Get page table entry from either stack growth or upage
-    // user context and within page and esp
-    if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // if part of the stack
-      pte = malloc(sizeof(struct sup_pte));
-      page_add_sp(pte, upage);
-    }
-    else {
-      pte = page_get(upage);
-      if(pte == NULL) {
-        exit(-1);
-      }
-    }
-
-    // 2. If frame table is full, evict a frame and add the old upage to swap
+    // 0. Check if frame table is full
     if(kpage == NULL) { // evict first
-      kpage = run_clock(); // evict frame
+      kpage = run_clock();               // evict frame
+      // printf("kpage: %p\n", kpage);
       old_upage = frame_get_upage(kpage);
+      old_pte = page_get(old_upage);
       frame_dealloc(kpage);
       slot = swap_add(old_upage, kpage); // add to swap table
-      page_set_swap(pte, slot);
+      page_set_swap(old_pte, slot);
     }
 
-    // 3. If the page exists in swap get from swap
-    if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
-      page_set_swap(pte, -1);
+    // 1. Get page table entry
+    pte = page_get(upage);
+    if(pte == NULL) { // if null check for stack growth or exit
+      if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // stack growth
+        pte = malloc(sizeof(struct sup_pte));
+        page_add_sp(pte, upage);  // add new entry to sup page table
+      }
+      else
+        exit(-1);
     }
-    // 4. Else get the page from the file
-    else {
-      // pte = page_get(upage);
+    else { // if not null.. check if in swap first, else file read
+      // 2. Check swap table
+      if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
+        // printf("fault addr: %p, kpage: %p, swap entry: %d, thread: %s\n", fault_addr, kpage, pte->swap_entry, thread_current()->name);
 
-      if(pte != NULL) {
+        page_set_swap(pte, -1);
+
+      }
+      // 3. Load this page
+      else { // read from file
         file_seek (pte->file, pte->offset);
-      /* Load this page. */
         // LOCK AROUND FILE_READ
-        if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
-        {
+
+        if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes) {
           frame_dealloc(kpage);
           kill(f); 
         }
-
         memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
-      } 
+      }
     }
+
+
+
+    // // 1. Get page table entry from either stack growth or upage
+    // // user context and within page and esp
+    // if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // if part of the stack
+    //     printf("stack growth. fault addr: %p\n", fault_addr);
+    //   pte = malloc(sizeof(struct sup_pte));
+    //   page_add_sp(pte, upage);
+    // }
+    // else {
+    //   pte = page_get(upage);
+    //   if(pte == NULL) {
+    //     exit(-1);
+    //   }
+    // }
+
+    // // 2. If frame table is full, evict a frame and add the old upage to swap
+    // if(kpage == NULL) { // evict first
+    //   kpage = run_clock();               // evict frame
+    //   old_upage = frame_get_upage(kpage);
+    //   old_pte = page_get(old_upage);
+    //   frame_dealloc(kpage);
+    //   slot = swap_add(old_upage, kpage); // add to swap table
+    //   page_set_swap(old_pte, slot);
+    //   // printf("evict: %d\n", evict);
+    //   // evict++;
+    // }
+
+    // // 3. If the page exists in swap get from swap
+    // if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
+    //   page_set_swap(pte, -1);
+    //   // printf("rem: %d\n", rem);
+    //   // rem++;  
+    // }
+    // // 4. Else get the page from the file
+    // else {
+    //   if(pte != NULL) {
+    //     file_seek (pte->file, pte->offset);
+    //   /* Load this page. */
+    //     // LOCK AROUND FILE_READ
+    //     if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
+    //     {
+    //       frame_dealloc(kpage);
+    //       kill(f); 
+    //     }
+
+    //     memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
+    //   } 
+    // }
 
     // 5. Map page with frame
     /* Add the page to the process's address space. */
@@ -282,6 +329,5 @@ page_fault (struct intr_frame *f)
 
   //printf("There is no crying in Pintos!\n");
   exit(-1);
-
 }
 

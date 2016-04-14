@@ -57,6 +57,7 @@ int frame_set(void* upage, void* kpage) {
 	for(i = 0; i < length; i++) {
 		if(frames[i].kpage == kpage) {
 			frames[i].upage = upage;
+			frames[i].occupied = 1;
 			found = 1;
 			break;
 		}

@@ -20,6 +20,7 @@
 #include "threads/vaddr.h"
 #include "vm/frame.h"
 #include "vm/page.h"
+#include "vm/swap.h"
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -474,7 +475,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       //////// will create our supplemental PTE somewhere in here ///////////////////
       struct sup_pte* entry = malloc(sizeof(struct sup_pte));
       page_add(entry, upage, file, page_read_bytes, page_zero_bytes, writable, ofs);
-     // printf("load upage: %p\n", upage);
+      // printf("load upage: %p\n", upage);
       /* Load this page. */
       /*
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
