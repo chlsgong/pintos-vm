@@ -2,6 +2,10 @@
 #include <list.h>
 #include "threads/thread.h"
 #include "threads/malloc.h"
+#include "userprog/pagedir.h"
+#include "threads/synch.h"
+
+
 
 void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t page_read_bytes,
 	uint32_t page_zero_bytes, bool writable, off_t offset) {
@@ -55,5 +59,20 @@ void page_destroy() {
 			free(pte);
 		}
 	} 
+}
+
+
+void page_set_accessed(uint32_t* pd, void* upage, bool accessed) {
+	//lock_acquire(&page_lock);
+	pagedir_set_accessed(pd, upage, accessed);
+	//lock_release(&page_lock);
+}
+
+
+bool page_is_accessed(uint32_t* pd, void* upage) {
+	//lock_acquire(&page_lock);
+	bool accessed = pagedir_is_accessed(pd, upage);
+	//lock_release(&page_lock);
+	return accessed;
 }
 

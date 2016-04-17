@@ -20,7 +20,7 @@
 static void syscall_handler (struct intr_frame *);
 
 void halt (void) NO_RETURN;
-void exit (int status) NO_RETURN;
+//void exit (int status) NO_RETURN;
 pid_t exec (const char *file);
 int wait (pid_t);
 bool create (const char *file, unsigned initial_size);
@@ -49,8 +49,7 @@ void syscall_init (void) {
    on CREATE.  If CREATE is true, then a new page table is
    created and a pointer into it is returned.  Otherwise, a null
    pointer is returned. */
-static uint32_t *
-lookup_page (uint32_t *pd, const void *vaddr, bool create)
+uint32_t* lookup_page (uint32_t *pd, const void *vaddr, bool create)
 {
   uint32_t *pt, *pde;
 
@@ -262,6 +261,8 @@ void exit (int status) {
   } 
 
   printf("%s: exit(%d)\n", thread_current()->file_name, status);  
+  // printf("%s: exit(%d), tid: %d\n", thread_current()->file_name, status, thread_current()->tid);  
+
   sema_up(&thread_current()->process_sema);
 
   if(file_lock.holder == thread_current()) {
@@ -292,9 +293,12 @@ void exit (int status) {
 
 pid_t exec (const char *file) {
   /*Jasmine Drove here*/
-  valid_pointer(file);
+
+  valid_pointer(file);  
   process_execute(file);
   if(thread_current()->success) {
+  //printf("exec. thread: %d. child: %d\n", thread_current()->tid, thread_current()->child_pid);
+
     return thread_current()->child_pid;
   }
   return PID_ERROR;
@@ -384,6 +388,7 @@ int filesize (int fd){
 
 int read (int fd, void *buffer, unsigned size){
   /*Charles Drove here*/
+  printf("READING. AYYYYYYEEEEEEE\n");
   int num_bytes = -1;
   struct list_elem* e;
   struct open_file* of;

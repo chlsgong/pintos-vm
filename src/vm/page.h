@@ -23,5 +23,7 @@ void page_add_sp(struct sup_pte*, void*);
 struct sup_pte *page_get(void*);
 void page_set_swap(struct sup_pte*, int);
 void page_destroy(void);
+void page_set_accessed(uint32_t*, void*, bool);
+bool page_is_accessed(uint32_t*, void*);
 
 #endif /* vm/page.h */

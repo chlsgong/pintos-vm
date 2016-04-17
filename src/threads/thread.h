@@ -154,12 +154,14 @@ struct thread
     int wait_flag;                      /*Set when wait() is called.*/
     struct file *exec_file;             /*File that is loaded in exec().*/
 
+    struct list sup_page_table;
+    //int argc; ///////////////////////////////////////////////////////////////////////
+
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
 
-    struct list sup_page_table;
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

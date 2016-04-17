@@ -8,7 +8,11 @@ typedef int pid_t;
 #define EXIT_SUCCESS 0          /* Successful execution. */
 #define EXIT_FAILURE 1          /* Unsuccessful execution. */
 
+#include "userprog/pagedir.h"
+
 struct file;
 void syscall_init (void);
+uint32_t* lookup_page (uint32_t*, const void*, bool);
+void exit (int status);
 
 #endif /* userprog/syscall.h */

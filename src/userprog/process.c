@@ -46,6 +46,7 @@ process_execute (const char *file_name)
 
   /* Create a new thread to execute FILE_NAME. */
   tid = thread_create (file_name, PRI_DEFAULT, start_process, fn_copy);
+
   sema_down(&thread_current()->new_proc->exec_sema);
 
   if (tid == TID_ERROR)
@@ -69,15 +70,21 @@ start_process (void *file_name_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (file_name, &if_.eip, &if_.esp);
+  //printf("START PROC AFTER LOAD ARGC: %d. thread: %d\n", thread_current()->argc, thread_current()->tid);
   thread_current()->parent_process->success = success;
   thread_current()->parent_process->child_pid = thread_current()->pid;
 
   /* If load failed, quit. */
-  palloc_free_page (file_name);
+  /////////////////////////////////////////////////// MOVE PALLOC FREE PAGE
+  //palloc_free_page (file_name);
   sema_up(&thread_current()->exec_sema);
   if (!success) {
+    palloc_free_page (file_name);
     exit(-1);
   }
+
+  //printf("2 START PROC AFTER LOAD ARGC: %d. thread: %d\n", thread_current()->argc, thread_current()->tid);
+
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -152,7 +159,6 @@ process_exit (void)
 {
   struct thread *cur = thread_current ();
   uint32_t *pd;
-  int i;
 
   frame_dealloc_all();
   swap_remove_process();
@@ -381,6 +387,9 @@ load (const char *file_name, void (**eip) (void), void **esp)
 
   success = true;
 
+  //printf("LOAD AFTER SETUP STACK ARGC: %d. thread: %d\n", thread_current()->argc, thread_current()->tid);
+
+
  done:
   /* We arrive here whether the load is successful or not. */
   // file_close (file);
@@ -465,35 +474,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_read_bytes = read_bytes < PGSIZE ? read_bytes : PGSIZE;
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
-      /* Get a page of memory. */
-      // move to page fault
-     /* uint8_t *kpage = frame_alloc(); //palloc_get_page (PAL_USER);
-      if (kpage == NULL) {
-        return false;
-      }*/
-
-      //////// will create our supplemental PTE somewhere in here ///////////////////
       struct sup_pte* entry = malloc(sizeof(struct sup_pte));
       page_add(entry, upage, file, page_read_bytes, page_zero_bytes, writable, ofs);
-      // printf("load upage: %p\n", upage);
-      /* Load this page. */
-      /*
-      if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
-        {
-          frame_dealloc(kpage);
-          //palloc_free_page (kpage);
-          return false; 
-        }
-      memset (kpage + page_read_bytes, 0, page_zero_bytes);
-
-      /* Add the page to the process's address space. */
-      // move this to page_fault (lazy loading)
-     /* if (!install_page (upage, kpage, writable)) 
-        {
-          frame_dealloc(kpage);
-          //palloc_free_page (kpage);
-          return false; 
-        } 
+      
       
       /* Advance. */
       read_bytes -= page_read_bytes;
@@ -519,21 +502,38 @@ setup_stack (void **esp, const char* file_name)
   int* address;
   size_t token_len, arg_bytes = 0;
   struct sup_pte* pte;
+  struct frame* frame;
+  void* old_upage;
+  struct thread* owner;
+  uint32_t* owner_pagedir;
   
-
-  kpage = frame_alloc(); //palloc_get_page (PAL_USER | PAL_ZERO);
+  lock_acquire(&evict_lock);
+  kpage = frame_alloc(((uint8_t *) PHYS_BASE) - PGSIZE); //palloc_get_page (PAL_USER | PAL_ZERO);
+  if(kpage == NULL) { // evict first
+      kpage = frame_evict();               // evict frame
+      frame = frame_get_frame(kpage);
+      old_upage = frame->upage;//frame_get_upage(kpage);
+      owner = frame->owner;
+      owner_pagedir = frame->pd;
+      frame_dealloc(kpage, owner_pagedir, old_upage);
+      swap_add(kpage, old_upage, owner); // add to swap table
+      frame_set(((uint8_t *) PHYS_BASE) - PGSIZE, kpage);
+  }
   if (kpage != NULL) 
     {
       success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
       pte = malloc(sizeof(struct sup_pte));
       page_add_sp(pte, ((uint8_t *) PHYS_BASE) - PGSIZE);
-      //printf("\nupage: %p\n", ((uint8_t *) PHYS_BASE) - PGSIZE);
-      //printf("esp limit: %x\n\n", ((uint8_t *) PHYS_BASE) - PGSIZE);
       if (success) {
         *esp = PHYS_BASE;
-        frame_set(((uint8_t *) PHYS_BASE) - PGSIZE, kpage);
-      } else
-        frame_dealloc(kpage); //palloc_free_page (kpage);
+      } else {
+        printf("INITIAL STACK PAGE INSTALL FAILED :(\n");
+        frame_dealloc(kpage, thread_current()->pagedir, ((uint8_t *) PHYS_BASE) - PGSIZE); //palloc_free_page (kpage);
+      }
+
+    } else {
+        printf("INITIAL STACK KPAGE == NULL :(\n");
+
     }
 
   strlcpy(file_cpy, file_name, strlen(file_name)+1);
@@ -548,14 +548,16 @@ setup_stack (void **esp, const char* file_name)
       break;
   }
   /*Jasmine Drove Here*/
+
   my_esp = (char*) *esp;
+
   for(i = argc-1; i >= 0; i--) {
     token_len = strlen(argv[i]) + 1;
     arg_bytes += token_len; // update total bytes
     my_esp -= token_len; // allocate token size
     strlcpy(my_esp, argv[i], token_len); // push arg onto stack
     address = (int *) my_esp;
-    argv[i] = address; // save address
+    argv[i] = (char*)address; // save address ////////////////////////ADDED CHAR* CAST !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! //////////////
   }
   my_esp -= (4 - (arg_bytes % 4)); // align stack
   my_esp -= 4; // null sentinel
@@ -568,11 +570,12 @@ setup_stack (void **esp, const char* file_name)
   my_esp -= 4;
   memcpy(my_esp, &address, sizeof(int)); // push address of argv onto stack
   my_esp -= 4;
-  *my_esp = argc; // push argc
+  *(int*)my_esp = argc; // push argc !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! ADDED INT CAST !!!!!!!!!!!!!!!!!!!!!1
+  //thread_current()->argc = *my_esp; //!!!!!!!!!!!!!!!!!!!!!!!! REMOVE THIS AND ARGC IN THREAD STRUCT
+  //printf("SETUP STACK ARGC: %d. thread: %d\n", thread_current()->argc, thread_current()->tid);
   my_esp -= 4;
-
   *esp = my_esp;
-
+  lock_release(&evict_lock);
   return success;
 }
 

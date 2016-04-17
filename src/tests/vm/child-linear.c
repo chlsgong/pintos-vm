@@ -3,6 +3,7 @@
    the zeros are back. */
 
 #include <string.h>
+//#include <stdio.h>
 #include "tests/arc4.h"
 #include "tests/lib.h"
 #include "tests/main.h"
@@ -15,6 +16,7 @@ static char buf[SIZE];
 int
 main (int argc, char *argv[])
 {
+  //printf("MAIN START. argv: %p, argc addr: %p, argc: %d\n\n", argv, &argc, argc);
   const char *key = argv[argc - 1];
   struct arc4 arc4;
   size_t i;

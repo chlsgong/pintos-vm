@@ -21,6 +21,9 @@ static long long page_fault_cnt;
 static void kill (struct intr_frame *);
 static void page_fault (struct intr_frame *);
 
+//struct lock evict_lock;
+//struct lock pin_lock;
+
 /* Registers handlers for interrupts that can be caused by user
    programs.
 
@@ -68,6 +71,8 @@ exception_init (void)
      We need to disable interrupts for page faults because the
      fault address is stored in CR2 and needs to be preserved. */
   intr_register_int (14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
+
+  
 }
 
 /* Prints exception statistics. */
@@ -130,29 +135,41 @@ page_install (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-static void* run_clock(void) {
-  void* freed_frame = NULL;
-  void* upage = NULL;
-  while(!freed_frame) {
-    upage = frames[clock_ptr].upage;
-    if(pagedir_is_accessed(thread_current()->pagedir, upage)) {
-      pagedir_set_accessed(thread_current()->pagedir, upage, false);
-    } else {
-      freed_frame = frames[clock_ptr].kpage;
-    }
-    if(clock_ptr == (length - 1)) {
-      clock_ptr = 0;
-    } else {
-      clock_ptr++;
-    }
-  }
-  return freed_frame;
-}
+
+
+
+
+
+
+
+// static void* run_clock(void) {
+//   void* freed_frame = NULL;
+//   void* upage = NULL;
+//   uint32_t* pd = NULL;
+//   lock_acquire(&frame_lock);
+//   while(!freed_frame) {
+//     upage = frames[clock_ptr].upage;
+//     if(upage == 0xbffff000)
+//       printf("upage: %p, owner: %d.\n", upage, frames[clock_ptr].owner->tid);
+//     pd = frames[clock_ptr].pd;
+//     if(page_is_accessed(pd, upage)) {
+//       page_set_accessed(pd, upage, false);
+//     } else {
+//       freed_frame = frames[clock_ptr].kpage;
+//     }
+//     if(clock_ptr == (length - 1)) {
+//       clock_ptr = 0;
+//     } else {
+//       clock_ptr++;
+//     }
+//   }
+//   lock_release(&frame_lock);
+//   return freed_frame;
+// }
 
 /* Page fault handler.  This is a skeleton that must be filled in
    to implement virtual memory.  Some solutions to project 2 may
    also require modifying this code.
-
    At entry, the address that faulted is in CR2 (Control Register
    2) and information about the fault, formatted as described in
    the PF_* macros in exception.h, is in F's error_code member.  The
@@ -192,10 +209,13 @@ page_fault (struct intr_frame *f)
   void* upage;
   void* old_upage;
   struct sup_pte* pte;
-  struct sup_pte* old_pte;
+  //struct sup_pte* old_pte;
   uint8_t* kpage;
   void* esp;
-  int slot;
+  //int slot;
+  uint32_t* owner_pagedir;
+  struct thread* owner;
+  struct frame* frame;
 
   if(fault_addr == NULL)
     kill(f);
@@ -208,18 +228,26 @@ page_fault (struct intr_frame *f)
   }
 
   if(not_present) {
+    lock_acquire(&evict_lock);
     upage = pg_round_down(fault_addr);
-    kpage = frame_alloc();
+    kpage = frame_alloc(upage);
 
     // 0. Check if frame table is full
     if(kpage == NULL) { // evict first
-      kpage = run_clock();               // evict frame
-      // printf("kpage: %p\n", kpage);
-      old_upage = frame_get_upage(kpage);
-      old_pte = page_get(old_upage);
-      frame_dealloc(kpage);
-      slot = swap_add(old_upage, kpage); // add to swap table
-      page_set_swap(old_pte, slot);
+      kpage = frame_evict();               // evict frame
+      frame = frame_get_frame(kpage);
+      old_upage = frame->upage;
+      owner = frame->owner;
+      // if(owner->tid == 6 || owner->tid == 7)
+      //   printf("EVICTING. thread: %d, owner: %d, page: %p, argc: %d\n", thread_current()->tid, owner->tid, old_upage, owner->argc);
+      owner_pagedir = frame->pd;
+      frame_dealloc(kpage, owner_pagedir, old_upage);
+      swap_add(kpage, old_upage, owner); // add to swap table
+      frame_set(upage, kpage);
+      // if(owner->tid == 6 || owner->tid == 7)
+      //   printf("owner argc after swap add: %d\n", owner->argc);
+    } else {
+      frame = frame_get_frame(kpage);
     }
 
     // 1. Get page table entry
@@ -229,16 +257,22 @@ page_fault (struct intr_frame *f)
         pte = malloc(sizeof(struct sup_pte));
         page_add_sp(pte, upage);  // add new entry to sup page table
       }
-      else
+     else if(user) {
+       printf("exiting pte == null, upage: %p, thread: %d\n", fault_addr, thread_current()->tid);
+       lock_release(&evict_lock);
+       PANIC("why is pte NULLLLLLLLLLLLLLLLLLLLLLLLL");
+     } 
+      else {
+       printf("exiting kernel???????, upage: %p\n", fault_addr);
+        lock_release(&evict_lock);
+       PANIC("why are we in KERNELLLLLLLLLLLLLLLLLLLL");
         exit(-1);
+      }
     }
     else { // if not null.. check if in swap first, else file read
       // 2. Check swap table
-      if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
-        // printf("fault addr: %p, kpage: %p, swap entry: %d, thread: %s\n", fault_addr, kpage, pte->swap_entry, thread_current()->name);
-
-        page_set_swap(pte, -1);
-
+      if(swap_remove(kpage, upage)) { // read from swap if exists
+        //////
       }
       // 3. Load this page
       else { // read from file
@@ -246,7 +280,7 @@ page_fault (struct intr_frame *f)
         // LOCK AROUND FILE_READ
 
         if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes) {
-          frame_dealloc(kpage);
+          //frame_dealloc(kpage);
           kill(f); 
         }
         memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
@@ -255,66 +289,19 @@ page_fault (struct intr_frame *f)
 
 
 
-    // // 1. Get page table entry from either stack growth or upage
-    // // user context and within page and esp
-    // if ((fault_addr < PHYS_BASE) && (fault_addr >= (esp - 32))) { // if part of the stack
-    //     printf("stack growth. fault addr: %p\n", fault_addr);
-    //   pte = malloc(sizeof(struct sup_pte));
-    //   page_add_sp(pte, upage);
-    // }
-    // else {
-    //   pte = page_get(upage);
-    //   if(pte == NULL) {
-    //     exit(-1);
-    //   }
-    // }
-
-    // // 2. If frame table is full, evict a frame and add the old upage to swap
-    // if(kpage == NULL) { // evict first
-    //   kpage = run_clock();               // evict frame
-    //   old_upage = frame_get_upage(kpage);
-    //   old_pte = page_get(old_upage);
-    //   frame_dealloc(kpage);
-    //   slot = swap_add(old_upage, kpage); // add to swap table
-    //   page_set_swap(old_pte, slot);
-    //   // printf("evict: %d\n", evict);
-    //   // evict++;
-    // }
-
-    // // 3. If the page exists in swap get from swap
-    // if(swap_remove(pte->swap_entry, kpage)) { // read from swap if exists
-    //   page_set_swap(pte, -1);
-    //   // printf("rem: %d\n", rem);
-    //   // rem++;  
-    // }
-    // // 4. Else get the page from the file
-    // else {
-    //   if(pte != NULL) {
-    //     file_seek (pte->file, pte->offset);
-    //   /* Load this page. */
-    //     // LOCK AROUND FILE_READ
-    //     if (file_read (pte->file, kpage, pte->page_read_bytes) != (int) pte->page_read_bytes)
-    //     {
-    //       frame_dealloc(kpage);
-    //       kill(f); 
-    //     }
-
-    //     memset (kpage + pte->page_read_bytes, 0, pte->page_zero_bytes);
-    //   } 
-    // }
-
     // 5. Map page with frame
     /* Add the page to the process's address space. */
     // move this to page_fault (lazy loading)
     if (!page_install (upage, kpage, pte->writable)) 
     {
-      frame_dealloc(kpage);
+      //frame_dealloc(kpage);
       kill(f); 
     }
-    frame_set(upage, kpage);
-    return;
-  } 
-
+    lock_release(&evict_lock);
+    //return;
+  } else {
+      exit(-1);
+  }
 
 
   /* To implement virtual memory, delete the rest of the function
@@ -328,6 +315,13 @@ page_fault (struct intr_frame *f)
 
 
   //printf("There is no crying in Pintos!\n");
-  exit(-1);
+  //lock_release(&evict_lock);
+
+  //exit(-1);
 }
+
+
+
+
+
 
