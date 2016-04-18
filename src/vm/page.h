@@ -6,15 +6,17 @@
 #include <list.h>
 #include "devices/block.h"
 
+/*Jorge Drove Here*/
+
+/* Supplementary page table entry. */
 struct sup_pte {
-	int swap_entry;
-	void* page;
-	struct file *file; 
-	uint32_t page_read_bytes;
-	uint32_t page_zero_bytes;
-	bool writable;
-	off_t offset;
-	struct list_elem sup_elem;
+	void* page; // page that needs to be loaded
+	struct file *file; // file that contains the data/program
+	uint32_t page_read_bytes; // number of bytes read to a page
+	uint32_t page_zero_bytes; // number of bytes left over that zeroes out a page
+	bool writable; // writable flag for the file
+	off_t offset; // file pointer offset
+	struct list_elem sup_elem; // element for the supplementary page table list
 };
 
 void page_add(struct sup_pte*, void*, struct file*,

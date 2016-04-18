@@ -522,10 +522,6 @@ init_thread (struct thread *t, const char *name, int priority)
   t->fd_cnt = 2;
   t->exec_file = NULL;
 
-  //////////////////////////////////////////////////////////////////
-  //t->argc = 0;
-
-
   list_init(&t->open_files);
   list_init(&t->sup_page_table);
 

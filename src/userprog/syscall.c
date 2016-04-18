@@ -20,7 +20,6 @@
 static void syscall_handler (struct intr_frame *);
 
 void halt (void) NO_RETURN;
-//void exit (int status) NO_RETURN;
 pid_t exec (const char *file);
 int wait (pid_t);
 bool create (const char *file, unsigned initial_size);
@@ -261,7 +260,6 @@ void exit (int status) {
   } 
 
   printf("%s: exit(%d)\n", thread_current()->file_name, status);  
-  // printf("%s: exit(%d), tid: %d\n", thread_current()->file_name, status, thread_current()->tid);  
 
   sema_up(&thread_current()->process_sema);
 
@@ -279,7 +277,6 @@ void exit (int status) {
       e = next;
     }
   } 
-
 
   // close the current process' file (executable)
   if(thread_current()->exec_file != NULL) {
@@ -388,7 +385,6 @@ int filesize (int fd){
 
 int read (int fd, void *buffer, unsigned size){
   /*Charles Drove here*/
-  printf("READING. AYYYYYYEEEEEEE\n");
   int num_bytes = -1;
   struct list_elem* e;
   struct open_file* of;
@@ -548,4 +544,3 @@ void close (int fd) {
   }
   lock_release(&file_lock);
 }
-

@@ -153,15 +153,12 @@ struct thread
     struct list_elem child_elem;        /*List element for children list.*/
     int wait_flag;                      /*Set when wait() is called.*/
     struct file *exec_file;             /*File that is loaded in exec().*/
-
-    struct list sup_page_table;
-    //int argc; ///////////////////////////////////////////////////////////////////////
+    struct list sup_page_table;         /*Supplementary page table list.*/
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
 #endif
-
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

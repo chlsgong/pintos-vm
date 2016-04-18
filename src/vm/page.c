@@ -5,12 +5,11 @@
 #include "userprog/pagedir.h"
 #include "threads/synch.h"
 
-
-
+// Adds an entry to the supplementary page table 
 void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t page_read_bytes,
 	uint32_t page_zero_bytes, bool writable, off_t offset) {
+	/*Charles Drove Here*/
 	
-	entry->swap_entry = -1;
 	entry->page = page;
 	entry->file = file; 
 	entry->page_read_bytes = page_read_bytes;
@@ -20,14 +19,17 @@ void page_add(struct sup_pte* entry, void* page, struct file *file, uint32_t pag
 	list_push_back(&thread_current()->sup_page_table, &entry->sup_elem);
 }
 
+// Adds an entry to the supplementary page table for stack growth
 void page_add_sp(struct sup_pte* entry, void* page) {
-	entry->swap_entry = -1;
+	/*Charles Drove Here*/
 	entry->page = page;
 	entry->writable = true;
 	list_push_back(&thread_current()->sup_page_table, &entry->sup_elem);
 }
 
+// Returns a supplementary page table entry for a given upage
 struct sup_pte* page_get(void* upage) {
+	/*Jasmine Drove Here*/
 	struct list_elem* e;
 	struct sup_pte* pte;
 	for (e = list_begin (&thread_current()->sup_page_table); 
@@ -42,11 +44,9 @@ struct sup_pte* page_get(void* upage) {
 	return NULL;
 }
 
-void page_set_swap(struct sup_pte* entry, int start) {
-	entry->swap_entry = start;
-}
-
+// Deallocates all the supplementary page table entries of the calling process
 void page_destroy() {
+	/*Jasmine Drove Here*/
 	struct list_elem* e;
 	struct sup_pte* pte;
 	struct thread* t = thread_current();
@@ -61,18 +61,15 @@ void page_destroy() {
 	} 
 }
 
-
+// Calls pagedir_set_accessed to set the accessed bit for a given upage
 void page_set_accessed(uint32_t* pd, void* upage, bool accessed) {
-	//lock_acquire(&page_lock);
+	/*Rebecca Drove Here*/
 	pagedir_set_accessed(pd, upage, accessed);
-	//lock_release(&page_lock);
 }
 
-
+// Returns true if the accessed bit is set, false otherwise.
 bool page_is_accessed(uint32_t* pd, void* upage) {
-	//lock_acquire(&page_lock);
+	/*Rebecca Drove Here*/
 	bool accessed = pagedir_is_accessed(pd, upage);
-	//lock_release(&page_lock);
 	return accessed;
 }
-

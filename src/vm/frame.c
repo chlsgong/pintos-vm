@@ -6,14 +6,12 @@
 #include "threads/malloc.h"
 #include "vm/page.h"
 #include "userprog/pagedir.h"
-
 #include "threads/vaddr.h"
 #include <stdio.h>
 
- //static struct lock frame_lock;
-
 // Initializes the frame table
 void frame_init(size_t size) {
+	/*Charles Drove Here*/
 	unsigned i;
 	struct frame f;
 	frames = malloc(sizeof(struct frame) * size);
@@ -27,8 +25,6 @@ void frame_init(size_t size) {
 		f.upage = NULL;
 		f.owner = NULL;
 		f.occupied = 0;
-		f.evictable = 1;
-		f.pte = NULL;
 		f.pd = NULL;
 		frames[i] = f;
 		length++;
@@ -36,9 +32,9 @@ void frame_init(size_t size) {
 	clock_ptr = 0;
 }
 
-
 // Allocates a frame given a user address
 void* frame_alloc(void* upage) {
+	/*Charles Drove Here*/
 	lock_acquire(&frame_lock);
 	int i = 0;
 	void* kpage = NULL;
@@ -56,11 +52,10 @@ void* frame_alloc(void* upage) {
 	return kpage;
 }
 
-
-
 // Sets a frame's mapping to a different user address
-// Useful for eviction
+// Useful for eviction, returns 1 if successful
 int frame_set(void* upage, void* kpage) {
+	/*Rebecca Drove Here*/
 	lock_acquire(&frame_lock);
 	int i;
 	int found = 0;
@@ -78,25 +73,9 @@ int frame_set(void* upage, void* kpage) {
 	return found;
 }
 
-
-
-
-void* frame_get_upage(void* kpage) {
-	lock_acquire(&frame_lock);
-	int i;
-	void* upage = NULL;
-	for(i = 0; i < length; i++) {
-		if(frames[i].kpage == kpage) {
-			upage = frames[i].upage;
-			break;
-		}
-	}
-	lock_release(&frame_lock);
-	return upage;
-}
-
-
+// Deallocates all frames that belong to an exiting thread
 void frame_dealloc_all() {
+	/*Rebecca Drove Here*/
 	lock_acquire(&frame_lock);
 	int i;
 	for(i = 0; i < length; i++) {
@@ -111,21 +90,20 @@ void frame_dealloc_all() {
     lock_release(&frame_lock);
 }
 
-
-// Deallocates and frees a frame
-void frame_dealloc(void* kpage, uint32_t* owner_pd, void* upage) {
+// Clears the mapping to a given kpage and frees a frame
+void frame_dealloc(void* kpage) {
+	/*Jorge Drove Here*/
 	lock_acquire(&frame_lock);
 	int i;
 	for(i = 0; i < length; i++) {
 		if(frames[i].kpage == kpage) {
-			if(upage != NULL)
-				pagedir_clear_page(owner_pd, upage);
-			else {
-				printf("UPAGE NULL DEALLOC :(\n");
-				exit(-1);
+			if(frames[i].upage != NULL) {
+				pagedir_clear_page(frames[i].pd, frames[i].upage);
+				frames[i].upage = NULL;
 			}
+			else
+				exit(-1);
 			frames[i].owner = NULL;
-			frames[i].upage = NULL;
 			frames[i].pd = NULL;
 			frames[i].occupied = 0;
 			break;
@@ -134,33 +112,33 @@ void frame_dealloc(void* kpage, uint32_t* owner_pd, void* upage) {
 	lock_release(&frame_lock);
 }
 
-
-
+// Chooses a frame to be evicted using the clock algorithm
 void* frame_evict() {
-  lock_acquire(&frame_lock);
-  void* freed_frame = NULL;
-  void* upage = NULL;
-  uint32_t* pd = NULL;
-  while(!freed_frame) {
-    upage = frames[clock_ptr].upage;
-    pd = frames[clock_ptr].pd;
-    if(page_is_accessed(pd, upage)) {
-      page_set_accessed(pd, upage, false);
-    } else {
-      freed_frame = frames[clock_ptr].kpage;
-    }
-    if(clock_ptr == (length - 1)) {
-      clock_ptr = 0;
-    } else {
-      clock_ptr++;
-    }
-  }
-  lock_release(&frame_lock);
-  return freed_frame;
+	/*Jasmine Drove Here*/
+	lock_acquire(&frame_lock);
+	void* freed_frame = NULL;
+	void* upage = NULL;
+	uint32_t* pd = NULL;
+
+	while(!freed_frame) {
+	    upage = frames[clock_ptr].upage;
+	    pd = frames[clock_ptr].pd;
+	    if(page_is_accessed(pd, upage))
+	      	page_set_accessed(pd, upage, false);
+	    else
+	      	freed_frame = frames[clock_ptr].kpage;
+	    if(clock_ptr == (length - 1))
+	      	clock_ptr = 0;
+	   	else
+	    	clock_ptr++;
+	}
+	lock_release(&frame_lock);
+	return freed_frame;
 }
 
-
+// Returns a frame struct given a kpage
 struct frame* frame_get_frame(void* kpage) {
+	/*Jasmine Drove Here*/
 	lock_acquire(&frame_lock);
 	int i;
 	for(i = 0; i < length; i++) {

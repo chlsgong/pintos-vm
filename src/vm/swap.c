@@ -7,10 +7,11 @@
 #include "userprog/pagedir.h"
 #include "vm/page.h"
 
+// Initializes the swap table and swap device
 void swap_init() {
+	/*Jorge Drove Here*/
 	int i;
 	swap_device = block_get_role(BLOCK_SWAP);
-	lock_init(&swap_lock);
 	
 	if (swap_device == NULL)
     	PANIC("No swap device found, can't initialize swap.");
@@ -22,8 +23,9 @@ void swap_init() {
     }
 }
 
-
+// Adds a page to a swap slot and updates the swap table
 int swap_add(void* kpage, void* upage, struct thread* t) {
+	/*Charles Drove Here*/
     int i, j;
     int ofs = 0;
 
@@ -45,12 +47,15 @@ int swap_add(void* kpage, void* upage, struct thread* t) {
 	PANIC("No free swap slot available.");
 }
 
+// Removes a page from swap and reads it to memory 
+// updates the swap table
+// Returns 1 if successful, 0 otherwise
 int swap_remove(void* kpage, void* upage) {
+	/*Jasmine Drove Here*/
 	int i, j;
 	int ofs = 0;
 
     lock_acquire(&frame_lock);
-
     for(i = 0; i < NUM_SECTORS; i++) {
 		if((swap_table[i].owner == thread_current()) && (upage == swap_table[i].upage)) {
 			swap_table[i].free = 1;
@@ -68,7 +73,9 @@ int swap_remove(void* kpage, void* upage) {
 	return 0;
 }
 
+// Removes the pages that belong to an exiting process from swap
 void swap_remove_process() {
+	/*Rebecca Drove Here*/
 	int i = 0;	
     lock_acquire(&frame_lock);
 	for(i = 0; i < NUM_SECTORS; i++) {
